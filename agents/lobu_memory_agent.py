@@ -28,11 +28,26 @@ def _client() -> LobuMemoryClient:
 
 
 class LobuMemoryAgent(_FullHistoryAgent):
-    """FullHistoryAgent + Lobu-backed procedural-learning retrieval."""
+    """FullHistoryAgent + Lobu-backed procedural-learning retrieval.
+
+    Retrieval is idempotent per task: the first call queries Lobu and caches the
+    result; later calls return the cached set. This prevents the redundant
+    re-querying that derailed already-correct trajectories (see the
+    change_flight_medical regression: 3x retrieve, identical query twice, which
+    added deliberation overhead and mis-sequenced an otherwise-clean task).
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._retrieval_cache: list[str] | None = None
 
     def retrieve_learnings(self, query: str, top_k: int = 3) -> list[str]:
+        if self._retrieval_cache is not None:
+            return self._retrieval_cache
         try:
-            return _client().retrieve(query, top_k=top_k)
+            result = _client().retrieve(query, top_k=top_k)
         except Exception:
             # Retrieval is best-effort; never fail a task on a memory error.
-            return []
+            result = []
+        self._retrieval_cache = result
+        return result
