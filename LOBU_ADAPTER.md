@@ -50,11 +50,11 @@ uv run python scripts/build_lobu_learnings.py --domain travel --limit 30
 
 # 3a) baseline (no memory)
 uv run python -m state_bench.scripts.run_batch --domain travel \
-  --agent-class FullHistoryAgent --agent-model-name glm-4.6 --num-runs 5 --num-workers 2
+  --agent-class FullHistoryAgent --agent-model-name glm-5.2 --num-runs 5 --num-workers 2
 
 # 3b) Lobu memory
 uv run python -m state_bench.scripts.run_batch --domain travel \
-  --agent-class LobuMemoryAgent --agent-model-name glm-4.6 \
+  --agent-class LobuMemoryAgent --agent-model-name glm-5.2 \
   --retrieve-learnings-top-k 3 --num-runs 5 --num-workers 2
 
 # 4) metrics
