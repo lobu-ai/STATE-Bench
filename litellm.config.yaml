@@ -1,0 +1,19 @@
+model_list:
+  # The harness sends model=<deployment name>. We expose "gpt-5.4" and route it
+  # to OpenRouter's real gpt-5.4 over Chat Completions, bridged from the Responses API.
+  # PIPELINE-VALIDATION backend: Gemini free tier (OpenRouter is out of credits).
+  # Swap back to openrouter/openai/gpt-5.4 once credits exist for the comparable run.
+  - model_name: gpt-5.4
+    litellm_params:
+      model: openai/glm-5.2
+      api_base: https://api.z.ai/api/coding/paas/v4
+      api_key: os.environ/Z_AI_API_KEY
+      use_chat_completions_api: true
+
+litellm_settings:
+  drop_params: true
+  # Keep Responses API session state so previous_response_id chaining works through the bridge.
+  store_prompts_in_spend_logs: false
+
+general_settings:
+  master_key: sk-statebench-local
