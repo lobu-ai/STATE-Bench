@@ -67,3 +67,47 @@ For leaderboard-**comparable** scores, point `litellm.config.yaml` at the real
 to GPT-5.4). GLM gives a directional, internal signal only.
 
 > Note: z.ai's GLM Coding Plan rate-limits aggressively; keep `--num-workers` at 1–2.
+
+## Subscription-OAuth backends (no metered API key)
+
+Two consumer subscriptions can serve the harness without a platform API key, via
+thin reverse proxies in `proxies/` that adapt each backend to STATE-Bench's
+non-streaming Responses calls. Each re-reads its OAuth token per request so CLI
+refreshes propagate live. Point `STATE_BENCH_EVAL_*`/`AGENT_*` at the proxy on
+`http://localhost:4000`.
+
+| Proxy | Backend | Model | Notes |
+| --- | --- | --- | --- |
+| `proxies/codex-proxy.py` | ChatGPT (Codex) `chatgpt.com/backend-api/codex/responses` | **`gpt-5.4`** (the locked model) | Native Responses API. **Leaderboard-comparable model.** Needs a `~/.codex/auth.json` from `codex` "Sign in with ChatGPT". |
+| `proxies/xai-proxy.py` | xAI `api.x.ai/v1` | `grok-4.3` | Native Responses API passthrough. Needs `~/.grok/auth.json` from the Grok CLI (SuperGrok OAuth, `api:access` scope). |
+
+**The Codex backend diverges from platform OpenAI** — `codex-proxy.py` handles all of it:
+it forces `stream:true` and de-streams the SSE back into one JSON `Response` (the
+backend's `response.completed` ships an empty `output`, so output items are spliced
+in from `output_item.done` events); injects a placeholder `instructions` (required);
+and strips `temperature`, `max_output_tokens`, and `previous_response_id` (all rejected).
+Only `gpt-5.4` is served — `gpt-5.4-codex`/`gpt-5` are blocked for ChatGPT accounts.
+
+**Rate limits matter.** ChatGPT Plus exposes a 5-hour primary window and a 7-day
+secondary window (`x-codex-*-used-percent` response headers). Empirically ~50
+travel task-runs of `gpt-5.4` (agent + simulator + high-effort judge) consume
+~70% of one 5-hour window, so a full 50×5 × 2-condition run does **not** fit a
+single window — spread it across windows or keep the split small. The xAI OAuth
+token expires ~6h; refresh with `grok models` during long runs.
+
+## Results (this fork)
+
+Travel domain, `retrieve-learnings-top-k 3`, offline learnings built from the train split.
+
+| Model | Split | baseline pass@1 | +Lobu memory pass@1 | Δ | Notes |
+| --- | --- | --- | --- | --- | --- |
+| grok-4.3 | 50 tasks × 5 runs | 36% | **48%** | **+12pp** (pass^5 14%→26%, UX 3.91→4.27) | clean, complete |
+| gpt-5.4 (locked) | 50 tasks × 1 run | **50%** | — | — | baseline complete; memory run rate-truncated |
+| gpt-5.4 (locked) | 18-task matched subset | 56% | 44% | −11pp (UX +0.02) | preliminary, n=18, within noise |
+
+**Reading:** Lobu's procedural-learning hook gives a clear, low-variance lift on a
+weaker base model (grok-4.3, +12pp / +12pp) — more than 2× the +5/+4.6 of Microsoft's
+own Foundry Memory entry. On the stronger, locked `gpt-5.4` the effect is **not**
+positive on the sample we have (−11pp on n=18), echoing the general finding that
+memory's marginal value shrinks as the base model strengthens. The full `gpt-5.4`
+memory verdict (n=50) is pending a rate-window reset and is **not** claimed here.
