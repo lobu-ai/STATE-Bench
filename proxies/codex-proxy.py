@@ -54,7 +54,7 @@ def aggregate(stream) -> tuple[bytes, int]:
         s = raw.decode(errors="replace").strip()
         if not s.startswith("data:"):
             continue
-        payload = s[len("data:"):].strip()
+        payload = s[len("data:") :].strip()
         if not payload or payload == "[DONE]":
             continue
         try:
