@@ -97,6 +97,14 @@ token expires ~6h; refresh with `grok models` during long runs.
 
 ## Results (this fork)
 
+Benchmark memory failures are fatal: JSON-RPC errors, MCP tool errors, and
+retrieval exceptions must be reported as failed task attempts. They must never
+be cached as an empty learning set, which would silently turn the memory arm
+into the baseline. An actual successful empty result remains valid and cached.
+`uv run pytest -q tests/test_lobu_mcp.py` checks the HTTP error boundary without
+provider credentials. Official comparisons still require the protocol-locked
+evaluation client documented in `docs/setup/eval-client.md`.
+
 Travel domain, `retrieve-learnings-top-k 3`, offline learnings built from the train split.
 
 | Model | Split | baseline pass@1 | +Lobu memory pass@1 | Δ | Notes |

@@ -41,7 +41,11 @@ class LobuMemoryClient:
             if sid:
                 self._session_id = sid
             raw = resp.read().decode()
-        return self._parse(raw), raw
+        parsed = self._parse(raw)
+        if "error" in parsed:
+            error = parsed["error"]
+            raise RuntimeError(f"MCP RPC error {error.get('code', 'unknown')}")
+        return parsed, raw
 
     @staticmethod
     def _parse(raw: str) -> dict:
@@ -81,14 +85,30 @@ class LobuMemoryClient:
                 "params": {"name": name, "arguments": arguments},
             }
         )
-        content = (result.get("result") or {}).get("content") or []
-        return "".join(c.get("text", "") for c in content if c.get("type") == "text")
+        tool_result = result.get("result")
+        if not isinstance(tool_result, dict):
+            raise RuntimeError(f"MCP tool {name} returned an invalid result")
+        if tool_result.get("isError"):
+            raise RuntimeError(f"MCP tool {name} failed")
+        content = tool_result.get("content")
+        if not isinstance(content, list):
+            raise RuntimeError(f"MCP tool {name} returned invalid content")
+        texts = []
+        for block in content:
+            if not isinstance(block, dict) or not isinstance(block.get("type"), str) or not block["type"]:
+                raise RuntimeError(f"MCP tool {name} returned an invalid content block")
+            if block["type"] == "text":
+                if not isinstance(block.get("text"), str):
+                    raise RuntimeError(f"MCP tool {name} returned an invalid text block")
+                texts.append(block["text"])
+        return "".join(texts)
 
     def save_learning(self, content: str) -> None:
         self._call_tool("save_memory", {"semantic_type": "note", "content": content, "metadata": {}})
 
     def retrieve(self, query: str, top_k: int = 3, candidate_limit: int = 10) -> list[str]:
-        text = self._call_tool("search_memory", {"query": query, "limit": candidate_limit})
+        # `limit` budgets entity matches; `content_limit` budgets recalled memories.
+        text = self._call_tool("search_memory", {"query": query, "content_limit": candidate_limit})
         # "Related Content" entries render as `> <content>` blockquotes.
         learnings: list[str] = []
         for line in text.splitlines():

@@ -44,10 +44,8 @@ class LobuMemoryAgent(_FullHistoryAgent):
     def retrieve_learnings(self, query: str, top_k: int = 3) -> list[str]:
         if self._retrieval_cache is not None:
             return self._retrieval_cache
-        try:
-            result = _client().retrieve(query, top_k=top_k)
-        except Exception:
-            # Retrieval is best-effort; never fail a task on a memory error.
-            result = []
+        # An unavailable memory arm must fail visibly, rather than silently
+        # becoming the no-memory baseline for the rest of the task.
+        result = _client().retrieve(query, top_k=top_k)
         self._retrieval_cache = result
         return result

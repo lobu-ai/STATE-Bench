@@ -25,7 +25,7 @@ class H(http.server.BaseHTTPRequestHandler):
         path = self.path
         for pre in ("/openai/v1", "/v1"):
             if path.startswith(pre):
-                path = path[len(pre):]
+                path = path[len(pre) :]
                 break
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length) if length else None
