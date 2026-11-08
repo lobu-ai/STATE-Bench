@@ -90,7 +90,9 @@ class LobuMemoryClient:
             raise RuntimeError(f"MCP tool {name} returned an invalid result")
         if tool_result.get("isError"):
             raise RuntimeError(f"MCP tool {name} failed")
-        content = tool_result.get("content") or []
+        content = tool_result.get("content")
+        if not isinstance(content, list):
+            raise RuntimeError(f"MCP tool {name} returned invalid content")
         return "".join(c.get("text", "") for c in content if c.get("type") == "text")
 
     def save_learning(self, content: str) -> None:

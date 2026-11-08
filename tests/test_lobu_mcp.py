@@ -52,6 +52,18 @@ class MemoryProtocolTest(unittest.TestCase):
     def test_empty_memory_is_a_valid_result(self):
         self.assertEqual(self.client.retrieve("flight changes"), [])
 
+    def test_missing_content_is_not_empty_memory(self):
+        self.envelope = {"result": {}}
+        with self.assertRaisesRegex(RuntimeError, "invalid content"):
+            self.client.retrieve("flight changes")
+
+    def test_non_array_content_is_not_empty_memory(self):
+        for value in (None, {}, "", False, 0):
+            with self.subTest(content=value):
+                self.envelope = {"result": {"content": value}}
+                with self.assertRaisesRegex(RuntimeError, "invalid content"):
+                    self.client.retrieve("flight changes")
+
     def test_json_rpc_failure_is_not_empty_memory(self):
         self.envelope = {"error": {"code": -32603, "message": "synthetic upstream outage"}}
         with self.assertRaisesRegex(RuntimeError, "MCP RPC error -32603"):
@@ -86,9 +98,10 @@ class MemoryProtocolTest(unittest.TestCase):
             lobu_memory_agent._CLIENT = None
             try:
                 handler = agent.tool_handlers["retrieve_learnings"]
-                self.envelope = {"result": {"isError": True, "content": []}}
-                with self.assertRaisesRegex(RuntimeError, "MCP tool search_memory failed"):
-                    handler({"query": "flight changes"})
+                for result in ({"isError": True, "content": []}, {}, {"content": None}):
+                    self.envelope = {"result": result}
+                    with self.assertRaises(RuntimeError):
+                        handler({"query": "flight changes"})
                 self.envelope = {
                     "result": {"content": [{"type": "text", "text": "> PROCEDURAL LEARNING: Retry proof."}]}
                 }
