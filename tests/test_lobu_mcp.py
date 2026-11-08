@@ -64,6 +64,29 @@ class MemoryProtocolTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "invalid content"):
                     self.client.retrieve("flight changes")
 
+    def test_malformed_content_blocks_do_not_become_empty_memory(self):
+        blocks = [
+            None,
+            [],
+            "",
+            {},
+            {"type": None},
+            {"type": ""},
+            {"type": "text"},
+            {"type": "text", "text": None},
+            {"type": "text", "text": 0},
+            {"type": "text", "text": []},
+        ]
+        for block in blocks:
+            with self.subTest(block=block):
+                self.envelope = {"result": {"content": [block]}}
+                with self.assertRaises(RuntimeError):
+                    self.client.retrieve("flight changes")
+
+    def test_explicit_empty_text_is_valid(self):
+        self.envelope = {"result": {"content": [{"type": "text", "text": ""}]}}
+        self.assertEqual(self.client.retrieve("flight changes"), [])
+
     def test_json_rpc_failure_is_not_empty_memory(self):
         self.envelope = {"error": {"code": -32603, "message": "synthetic upstream outage"}}
         with self.assertRaisesRegex(RuntimeError, "MCP RPC error -32603"):
@@ -98,7 +121,12 @@ class MemoryProtocolTest(unittest.TestCase):
             lobu_memory_agent._CLIENT = None
             try:
                 handler = agent.tool_handlers["retrieve_learnings"]
-                for result in ({"isError": True, "content": []}, {}, {"content": None}):
+                for result in (
+                    {"isError": True, "content": []},
+                    {},
+                    {"content": None},
+                    {"content": [{"type": "text"}]},
+                ):
                     self.envelope = {"result": result}
                     with self.assertRaises(RuntimeError):
                         handler({"query": "flight changes"})

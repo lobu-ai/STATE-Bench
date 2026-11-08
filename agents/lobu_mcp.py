@@ -93,7 +93,15 @@ class LobuMemoryClient:
         content = tool_result.get("content")
         if not isinstance(content, list):
             raise RuntimeError(f"MCP tool {name} returned invalid content")
-        return "".join(c.get("text", "") for c in content if c.get("type") == "text")
+        texts = []
+        for block in content:
+            if not isinstance(block, dict) or not isinstance(block.get("type"), str) or not block["type"]:
+                raise RuntimeError(f"MCP tool {name} returned an invalid content block")
+            if block["type"] == "text":
+                if not isinstance(block.get("text"), str):
+                    raise RuntimeError(f"MCP tool {name} returned an invalid text block")
+                texts.append(block["text"])
+        return "".join(texts)
 
     def save_learning(self, content: str) -> None:
         self._call_tool("save_memory", {"semantic_type": "note", "content": content, "metadata": {}})
